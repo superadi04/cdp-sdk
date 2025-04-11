@@ -1,0 +1,258 @@
+name: Deploy CDP SDK documentation to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      choice:
+        description: "SDK language to deploy"
+        required: true
+        type: choice
+        options:
+          - typescript
+          - python
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read
+
+jobs:
+  deploy-typescript-docs:
+    if: inputs.choice == 'typescript'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        name: Install pnpm
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: "./typescript/pnpm-lock.yaml"
+
+      - name: Install TypeScript dependencies
+        run: |
+          cd typescript
+          pnpm install
+
+      - name: Build TypeScript docs
+        run: |
+          cd typescript
+          pnpm run docs
+
+      - name: Upload TypeScript docs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: typescript-docs
+          path: ./typescript/docs
+
+      - name: Download Python docs
+        run: |
+          echo "Downloading Python docs artifact"
+          # Get the workflow ID first
+          workflow_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows | \
+            jq '.workflows[] | select(.name == "${{ github.workflow }}") | .id')
+
+          if [ -z "$workflow_id" ]; then
+            echo "Could not find workflow ID"
+            exit 1
+          fi
+
+          echo "Found workflow ID: $workflow_id"
+
+          # Check the last 30 runs
+          for i in {0..29}; do
+            # Get run ID from current workflow
+            run_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/$workflow_id/runs | \
+              jq -r ".workflow_runs[$i].id")
+
+            if [ -z "$run_id" ]; then
+              echo "Could not find run at index $i"
+              continue
+            fi
+
+            echo "Checking run ID: $run_id"
+
+            # Get the artifact ID from this run
+            artifact_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/artifacts | \
+              jq -r '.artifacts[] | select(.name=="python-docs") | .id')
+
+            if [ ! -z "$artifact_id" ]; then
+              echo "Found python-docs artifact in run $run_id"
+              echo "Found artifact ID: $artifact_id"
+
+              # Now download using the artifact ID
+              response=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                -L -o python-docs.zip \
+                https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$artifact_id/zip)
+              http_code=$(echo "$response" | tail -n1)
+
+              if [ "$http_code" = "200" ]; then
+                mkdir -p ./python/docs/_build/html
+                unzip python-docs.zip -d ./python/docs/_build/html
+                exit 0
+              else
+                echo "Failed to download Python docs artifact"
+                continue
+              fi
+            fi
+          done
+
+          echo "Could not find python-docs artifact in any recent runs"
+          exit 1
+
+      - name: Combine built assets into one folder
+        run: |
+          mkdir -p combined/typescript
+          mkdir -p combined/python
+
+          cp -r typescript/docs/* combined/typescript/
+          cp -r python/docs/_build/html/* combined/python/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: "./combined"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+  deploy-python-docs:
+    if: inputs.choice == 'python'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.5.0
+        with:
+          python-version: "3.10"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          cd python
+          make setup
+          make install
+          cd ..
+
+      - name: Build Sphinx Documentation for CDP SDK
+        run: |
+          pip install -U sphinx
+          pip install myst_parser sphinx_autodoc_typehints pydantic eth_account aiohttp aiohttp_retry cryptography jwt web3 pytest
+          pip install python-dateutil --upgrade
+          cd python
+          make docs
+          cd docs
+          make html
+          cd ../..
+
+      - name: Upload Python docs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: python-docs
+          path: ./python/docs/_build/html
+
+      - name: Download TypeScript docs
+        run: |
+          echo "Downloading TypeScript docs artifact"
+          # Get the workflow ID first
+          workflow_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows | \
+            jq -r ".workflows[] | select(.name == \"${{ github.workflow }}\") | .id")
+
+          if [ -z "$workflow_id" ]; then
+            echo "Could not find workflow ID"
+            exit 1
+          fi
+
+          echo "Found workflow ID: $workflow_id"
+
+          # Check the last 30 runs
+          for i in {0..29}; do
+            # Get run ID from current workflow
+            run_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/$workflow_id/runs | \
+              jq -r ".workflow_runs[$i].id")
+
+            if [ -z "$run_id" ]; then
+              echo "Could not find run at index $i"
+              continue
+            fi
+
+            echo "Checking run ID: $run_id"
+
+            # Get the artifact ID from this run
+            artifact_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/artifacts | \
+              jq -r '.artifacts[] | select(.name=="typescript-docs") | .id')
+
+            if [ ! -z "$artifact_id" ]; then
+              echo "Found typescript-docs artifact in run $run_id"
+              echo "Found artifact ID: $artifact_id"
+
+              # Now download using the artifact ID
+              response=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                -L -o typescript-docs.zip \
+                https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$artifact_id/zip)
+              http_code=$(echo "$response" | tail -n1)
+
+              if [ "$http_code" = "200" ]; then
+                mkdir -p ./typescript/docs
+                unzip typescript-docs.zip -d ./typescript/docs
+                exit 0
+              else
+                echo "Failed to download TypeScript docs artifact"
+                continue
+              fi
+            fi
+          done
+
+          echo "Could not find typescript-docs artifact in any recent runs"
+          exit 1
+
+      - name: Combine built assets into one folder
+        run: |
+          mkdir -p combined/typescript
+          mkdir -p combined/python
+
+          cp -r typescript/docs/* combined/typescript/
+          cp -r python/docs/_build/html/* combined/python/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: "./combined"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

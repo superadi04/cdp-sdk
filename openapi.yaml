@@ -1,0 +1,1956 @@
+openapi: 3.0.3
+info:
+  title: Coinbase Developer Platform APIs
+  description: The Coinbase Developer Platform APIs - leading the world's transition onchain.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  version: 2.0.0
+  contact:
+    name: Coinbase Developer Platform
+    email: cdp@coinbase.com
+    url: https://cdp.coinbase.com
+servers:
+  - url: https://api.cdp.coinbase.com/platform
+    description: The production server of the CDP APIs.
+security:
+  - bearerAuth: []
+tags:
+  - name: EVM Accounts
+    x-audience: public
+    description: |-
+      The EVM Account APIs enable you to create and use accounts across blockchains that are compatible with the Ethereum Virtual Machine (EVM).
+
+      An **account** is a private/public key pair that is used to sign transactions and messages. The private key is generated and used only in CDP's Trusted Execution Environment (TEE), and never exposed to Coinbase or the developer.
+
+      An EVM account is identified by its **address**, which is a 0x-prefixed hexadecimal string. The same address can be used across multiple EVM networks.
+
+      Accounts can optionally be assigned an **account name** at creation time for easier identification in subsequent API calls. EVM account names must be globally unique across all EVM accounts in the developer's CDP Project.
+
+      ## Authentication
+
+      The EVM Account APIs use two layers of authentication to ensure the security of your accounts' private keys:
+
+      - **CDP Secret API Key**: This key is used to authenticate all requests to the entire suite of
+         REST APIs offered on Coinbase Developer Platform.
+      - **Wallet Secret**: This secret is used specifically to authenticate sensitive wallet operations 
+        to `POST`, `PUT`, and `DELETE` endpoints in the EVM and Solana Account APIs.
+
+
+      To learn more about creating and using using these keys, visit our [Authentication docs](../docs/authentication).
+
+      :::tip Use our SDK
+
+
+      The [CDP SDK](https://github.com/coinbase/cdp-sdk) automatically authenticates requests using your CDP Secret API Key and Wallet Secret. Use the CDP SDK for a more convenient access to our APIs.
+
+
+      :::
+  - name: EVM Smart Accounts
+    x-audience: public
+    description: |-
+      The EVM Smart Account APIs enable you to create and manage Smart Account wallets across EVM-compatible blockchains.
+
+      A **Smart Account** is an EVM account that enables enhanced functionality such as account abstraction, batched transactions, and gas sponsorship through [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337). Smart Accounts allow users to create and manage "user operations" instead of traditional EVM transactions.
+      Smart Accounts are identified by their **address**, which is a 0x-prefixed hexadecimal string.
+      Smart Accounts can be assigned an optional **name** at creation time for easier identification in subsequent API calls.
+
+      A Smart Account has a single owner, which is another EVM Account which signs the Smart Account's transactions. The owner can be a CDP EVM account, or an account managed solely by the developer.
+  - name: Faucets
+    x-audience: public
+    description: The Faucet APIs enable you to request funds on supported test networks. Faucets are for testing purposes and make development easier by providing a source of funds.
+  - name: Solana Accounts
+    x-audience: public
+    description: |-
+      The Solana Account APIs enable you to create and use Solana accounts across SVM-compatible blockchains.
+
+      An **account** is a private/public key pair that is used to sign transactions and messages. The private key is generated and used only in CDP's Trusted Execution Environment (TEE), and never exposed to Coinbase or the developer.
+
+      A Solana account is identified by its **address**, which is a base-58 encoded string.
+
+      Accounts can optionally be assigned an **account name** at creation time for easier identification in subsequent API calls. Solana account names must be globally unique across all Solana accounts in the developer's CDP Project.
+
+      ## Authentication
+
+      The Solana Account APIs use two layers of authentication to ensure the security of your accounts' private keys:
+
+      - **CDP Secret API Key**: This key is used to authenticate all requests to the entire suite of
+         REST APIs offered on Coinbase Developer Platform.
+      - **Wallet Secret**: This secret is used specifically to authenticate sensitive wallet operations 
+        to `POST`, `PUT`, and `DELETE` endpoints in the EVM and Solana Account APIs.
+
+
+      To learn more about creating and using using these keys, visit our [Authentication docs](../docs/authentication).
+
+      :::tip Use our SDK
+
+
+      The [CDP SDK](https://github.com/coinbase/cdp-sdk) automatically authenticates requests using your CDP Secret API Key and Wallet Secret. Use the CDP SDK for a more convenient access to our APIs.
+
+
+      :::
+paths:
+  /v2/evm/accounts:
+    get:
+      x-audience: public
+      summary: List EVM accounts
+      description: |-
+        Lists the EVM accounts belonging to the developer's CDP Project.
+        The response is paginated, and by default, returns 20 accounts per page.
+      operationId: listEvmAccounts
+      tags:
+        - EVM Accounts
+      parameters:
+        - name: pageSize
+          description: The number of accounts to return per page.
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          example: 10
+        - name: pageToken
+          description: The token for the next page of accounts, if any.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: eyJsYXN0X2lkIjogImFiYzEyMyIsICJ0aW1lc3RhbXAiOiAxNzA3ODIzNzAxfQ==
+      responses:
+        '200':
+          description: Successfully listed EVM accounts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      accounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EvmAccount'
+                        description: The list of EVM accounts.
+                    required:
+                      - accounts
+                  - $ref: '#/components/schemas/ListResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      x-audience: public
+      summary: Create an EVM account
+      description: Creates a new EVM account.
+      operationId: createEvmAccount
+      tags:
+        - EVM Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: |-
+                    An optional name for the account.
+                    Account names can consist of alphanumeric characters and hyphens, and be between 2 and 36 characters long.
+                    Account names must be unique across all EVM accounts in the developer's CDP Project.
+                  example: my-wallet
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$
+      responses:
+        '201':
+          description: Successfully created EVM account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Project has no secret. Please register a secret with the project.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '409':
+          description: Resource already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                already_exists:
+                  value:
+                    errorType: already_exists
+                    errorMessage: EVM account with the given name already exists.
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/accounts/{address}:
+    get:
+      x-audience: public
+      summary: Get an EVM account by address
+      description: Gets an EVM account by its address.
+      operationId: getEvmAccount
+      tags:
+        - EVM Accounts
+      parameters:
+        - name: address
+          description: The 0x-prefixed address of the EVM account. The address does not need to be checksummed.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      responses:
+        '200':
+          description: Successfully got EVM account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'request body has an error: doesn''t match schema: Error at "name": string doesn''t match the regular expression "^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$"'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM account with the given address not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/accounts/by-name/{name}:
+    get:
+      x-audience: public
+      summary: Get an EVM account by name
+      description: Gets an EVM account by its name.
+      operationId: getEvmAccountByName
+      tags:
+        - EVM Accounts
+      parameters:
+        - name: name
+          description: The name of the EVM account.
+          in: path
+          required: true
+          schema:
+            type: string
+          example: my-account
+      responses:
+        '200':
+          description: Successfully got EVM account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'error: parameter "name" must be a string'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM account with the given address not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/accounts/{address}/sign/transaction:
+    post:
+      x-audience: public
+      summary: Sign a transaction
+      description: |-
+        Signs a transaction with the given EVM account.
+        The transaction should be serialized as a hex string using [RLP](https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp/).
+
+        The transaction must be an [EIP-1559 dynamic fee transaction](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md). The developer is responsible for ensuring that the unsigned transaction is valid, as the API will not validate the transaction.
+      operationId: signEvmTransaction
+      tags:
+        - EVM Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: address
+          description: The 0x-prefixed address of the EVM account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction:
+                  type: string
+                  description: The RLP-encoded transaction to sign, as a 0x-prefixed hex string.
+                  example: '0xf86b098505d21dba00830334509431415daf58e2c6b7323b4c58712fd92952145da79018080'
+              required:
+                - transaction
+      responses:
+        '200':
+          description: Successfully signed transaction.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedTransaction:
+                    type: string
+                    description: The RLP-encoded signed transaction, as a 0x-prefixed hex string.
+                    example: '0x1b0c9cf8cd4554c6c6d9e7311e88f1be075d7f25b418a044f4bf2c0a42a93e212ad0a8b54de9e0b5f7e3812de3f2c6cc79aa8c3e1c02e7ad14b4a8f42012c2c01b'
+                required:
+                  - signedTransaction
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                malformed_transaction:
+                  value:
+                    errorType: malformed_transaction
+                    errorMessage: Malformed unsigned transaction.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '403':
+          description: Access to resource forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                forbidden:
+                  value:
+                    errorType: forbidden
+                    errorMessage: Unable to sign transaction for this address.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM account with the given address not found.
+        '409':
+          $ref: '#/components/responses/AlreadyExistsError'
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/accounts/{address}/sign:
+    post:
+      x-audience: public
+      summary: Sign a hash
+      description: |-
+        Signs an arbitrary 32 byte hash with the given EVM account.
+
+
+        **WARNING: This API will likely be deprecated in the future.** It is recommended not to depend on it. Never sign a hash that you didn't generate, as it can be an arbitrary transaction. For example, it might send all of your funds to an attacker.
+      operationId: signEvmHash
+      tags:
+        - EVM Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: address
+          description: The 0x-prefixed address of the EVM account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hash:
+                  type: string
+                  description: The arbitrary 32 byte hash to sign.
+                  example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+              required:
+                - hash
+      responses:
+        '200':
+          description: Successfully signed hash.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signature:
+                    type: string
+                    description: The signature of the hash, as a 0x-prefixed hex string.
+                    example: '0x1b0c9cf8cd4554c6c6d9e7311e88f1be075d7f25b418a044f4bf2c0a42a93e212ad0a8b54de9e0b5f7e3812de3f2c6cc79aa8c3e1c02e7ad14b4a8f42012c2c01b'
+                required:
+                  - signature
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Request body must be specified.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM account with the given address not found.
+        '409':
+          $ref: '#/components/responses/AlreadyExistsError'
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/accounts/{address}/sign/message:
+    post:
+      x-audience: public
+      summary: Sign an EIP-191 message
+      description: |-
+        Signs an [EIP-191](https://eips.ethereum.org/EIPS/eip-191) message with the given EVM account.
+
+        Per the specification, the message in the request body is prepended with `0x19 <0x45 (E)> <thereum Signed Message:\n" + len(message)>` before being signed.
+      operationId: signEvmMessage
+      tags:
+        - EVM Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: address
+          description: The 0x-prefixed address of the EVM account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: The message to sign.
+                  example: Hello, world!
+              required:
+                - message
+      responses:
+        '200':
+          description: Successfully signed message.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signature:
+                    type: string
+                    description: The signature of the message, as a 0x-prefixed hex string.
+                    example: '0x1b0c9cf8cd4554c6c6d9e7311e88f1be075d7f25b418a044f4bf2c0a42a93e212ad0a8b54de9e0b5f7e3812de3f2c6cc79aa8c3e1c02e7ad14b4a8f42012c2c01b'
+                required:
+                  - signature
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM account with the given address not found.
+        '409':
+          $ref: '#/components/responses/AlreadyExistsError'
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/smart-accounts:
+    get:
+      summary: List Smart Accounts
+      description: |-
+        Lists the Smart Accounts belonging to the developer's CDP Project.
+        The response is paginated, and by default, returns 20 accounts per page.
+      operationId: listEvmSmartAccounts
+      tags:
+        - EVM Smart Accounts
+      parameters:
+        - name: pageSize
+          description: The number of accounts to return per page.
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          example: 10
+        - name: pageToken
+          description: The token for the next page of accounts, if any.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: eyJsYXN0X2lkIjogImFiYzEyMyIsICJ0aW1lc3RhbXAiOiAxNzA3ODIzNzAxfQ==
+      responses:
+        '200':
+          description: Successfully listed Smart Accounts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      accounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EvmSmartAccount'
+                        description: The list of Smart Accounts.
+                    required:
+                      - accounts
+                  - $ref: '#/components/schemas/ListResponse'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Invalid request. Please check the request body and parameters.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Create a Smart Account
+      description: Creates a new Smart Account.
+      operationId: createEvmSmartAccount
+      tags:
+        - EVM Smart Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owners:
+                  type: array
+                  description: Today, only a single owner can be set for a Smart Account, but this is an array to allow setting multiple owners in the future.
+                  items:
+                    type: string
+                    pattern: ^0x[0-9a-fA-F]{40}$
+                  example:
+                    - '0xfc807D1bE4997e5C7B33E4d8D57e60c5b0f02B1a'
+              required:
+                - owners
+      responses:
+        '201':
+          description: Successfully created Smart Account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmSmartAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Invalid owner address or account name provided.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/smart-accounts/{address}:
+    get:
+      summary: Get a Smart Account by address
+      description: Gets a Smart Account by its address.
+      operationId: getEvmSmartAccount
+      tags:
+        - EVM Smart Accounts
+      parameters:
+        - name: address
+          description: The 0x-prefixed address of the Smart Account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      responses:
+        '200':
+          description: Successfully got Smart Account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmSmartAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Invalid address provided.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: Smart Account with the given address not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/smart-accounts/{address}/user-operations:
+    post:
+      summary: Prepare a user operation
+      description: Prepares a new user operation on a Smart Account for a specific network.
+      operationId: prepareUserOperation
+      tags:
+        - EVM Smart Accounts
+      parameters:
+        - name: address
+          description: The address of the Smart Account to create the user operation on.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network:
+                  type: string
+                  description: The network to prepare the user operation for.
+                  enum:
+                    - base-sepolia
+                    - base
+                  example: base-sepolia
+                calls:
+                  type: array
+                  description: The list of calls to make from the Smart Account.
+                  items:
+                    $ref: '#/components/schemas/EvmCall'
+                paymasterUrl:
+                  type: string
+                  description: The URL of the paymaster to use for the user operation.
+                  example: https://api.developer.coinbase.com/rpc/v1/base/<token>
+              required:
+                - network
+                - calls
+      responses:
+        '201':
+          description: The prepared user operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmUserOperation'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Field "network" is required.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: EVM smart account with the given address not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/smart-accounts/{address}/user-operations/{userOpHash}:
+    get:
+      summary: Get a user operation
+      description: Gets a user operation by its hash.
+      operationId: getUserOperation
+      tags:
+        - EVM Smart Accounts
+      parameters:
+        - name: address
+          description: The address of the Smart Account the user operation belongs to.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+        - name: userOpHash
+          description: The hash of the user operation to fetch.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{64}$
+          example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+      responses:
+        '200':
+          description: Successfully retrieved the user operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmUserOperation'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Invalid request. Please check the request body and parameters.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: User operation not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/smart-accounts/{address}/user-operations/{userOpHash}/send:
+    post:
+      summary: Send a user operation
+      description: Sends a user operation with a signature.
+      operationId: sendUserOperation
+      tags:
+        - EVM Smart Accounts
+      parameters:
+        - name: address
+          description: The address of the Smart Account to send the user operation from.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+        - name: userOpHash
+          description: The hash of the user operation to send.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{64}$
+          example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signature:
+                  type: string
+                  description: The hex-encoded signature of the user operation.
+                  example: '0x1b0c9cf8cd4554c6c6d9e7311e88f1be075d7f25b418a044f4bf2c0a42a93e212ad0a8b54de9e0b5f7e3812de3f2c6cc79aa8c3e1c02e7ad14b4a8f42012c2c01b'
+              required:
+                - signature
+      responses:
+        '200':
+          description: The sent user operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvmUserOperation'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_signature:
+                  value:
+                    errorType: invalid_signature
+                    errorMessage: Invalid signature.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: User operation not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/evm/faucet:
+    post:
+      x-audience: public
+      summary: Request funds on EVM test networks
+      description: |
+        Request funds from the CDP Faucet on supported EVM test networks.
+
+        Faucets are available for ETH, USDC, EURC, and cbBTC on Base Sepolia and Ethereum Sepolia.
+
+        To prevent abuse, we enforce rate limits within a rolling 24-hour window to control the amount of funds that can be requested. 
+        These limits are applied at both the CDP User level and the blockchain address level. 
+        A single blockchain address cannot exceed the specified limits, even if multiple users submit requests to the same address.
+
+        | Token | Amount per Faucet Request |Rolling 24-hour window Rate Limits|
+        |:-----:|:-------------------------:|:--------------------------------:|
+        | ETH   | 0.0001 ETH                | 0.001 ETH                        |
+        | USDC  | 1 USDC                    | 10 USDC                          |
+        | EURC  | 1 EURC                    | 10 EURC                          |
+        | cbBTC | 0.0001 cbBTC              | 0.001 cbBTC                      |
+      operationId: requestEvmFaucet
+      tags:
+        - Faucets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network:
+                  type: string
+                  description: The network to request funds from.
+                  enum:
+                    - base-sepolia
+                    - ethereum-sepolia
+                  example: base-sepolia
+                address:
+                  type: string
+                  description: The address to request funds to, which is a 0x-prefixed hexadecimal string.
+                  pattern: ^0x[0-9a-fA-F]{40}$
+                  example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+                token:
+                  type: string
+                  description: The token to request funds for.
+                  enum:
+                    - eth
+                    - usdc
+                    - eurc
+                    - cbbtc
+                  example: eth
+              required:
+                - network
+                - address
+                - token
+      responses:
+        '200':
+          description: Successfully requested funds.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactionHash:
+                    type: string
+                    description: |-
+                      The hash of the transaction that requested the funds.
+                      **Note:** In rare cases, when gas conditions are unusually high, the transaction may not confirm, and the system may issue a replacement transaction to complete the faucet request. In these rare cases, the `transactionHash` will be out of sync with the actual faucet transaction that was confirmed onchain.
+                    example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+                required:
+                  - transactionHash
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'request body has an error: doesn''t match schema: Error at "address": string doesn''t match the regular expression "^0x[0-9a-fA-F]{40}$"'
+        '403':
+          description: Access to resource forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                forbidden:
+                  value:
+                    errorType: forbidden
+                    errorMessage: Unable to request faucet funds for this address.
+        '429':
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                faucet_limit_exceeded:
+                  value:
+                    errorType: faucet_limit_exceeded
+                    errorMessage: Faucet limit reached for this address. Please try again later.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/accounts:
+    get:
+      x-audience: public
+      summary: List Solana accounts or get account by name
+      description: |-
+        Lists the Solana accounts belonging to the developer.
+        The response is paginated, and by default, returns 20 accounts per page.
+
+        If a name is provided, the response will contain only the account with that name.
+      operationId: listSolanaAccounts
+      tags:
+        - Solana Accounts
+      parameters:
+        - name: pageSize
+          description: The number of accounts to return per page.
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          example: 10
+        - name: pageToken
+          description: The token for the next page of accounts, if any.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: eyJsYXN0X2lkIjogImFiYzEyMyIsICJ0aW1lc3RhbXAiOiAxNzA3ODIzNzAxfQ==
+      responses:
+        '200':
+          description: Successfully listed Solana accounts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      accounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SolanaAccount'
+                        description: The list of Solana accounts.
+                    required:
+                      - accounts
+                  - $ref: '#/components/schemas/ListResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      x-audience: public
+      summary: Create a Solana account
+      description: Creates a new Solana account.
+      operationId: createSolanaAccount
+      tags:
+        - Solana Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: |-
+                    An optional name for the account.
+                    Account names can consist of alphanumeric characters and hyphens, and be between 2 and 36 characters long.
+                    Account names must be unique across all Solana accounts in the developer's CDP Project.
+                  example: my-wallet
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$
+      responses:
+        '201':
+          description: Successfully created Solana account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolanaAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Project has no secret. Please register a secret with the project.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '409':
+          description: Resource already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                already_exists:
+                  value:
+                    errorType: already_exists
+                    errorMessage: Solana account with the given name already exists.
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/accounts/{address}:
+    get:
+      x-audience: public
+      summary: Get a Solana account by address
+      description: Gets a Solana account by its address.
+      operationId: getSolanaAccount
+      tags:
+        - Solana Accounts
+      parameters:
+        - name: address
+          description: The base58 encoded address of the Solana account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[1-9A-HJ-NP-Za-km-z]{32,44}$
+          example: HpabPRRCFbBKSuJr5PdkVvQc85FyxyTWkFM2obBRSvHT
+      responses:
+        '200':
+          description: Successfully got Solana account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolanaAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'request body has an error: doesn''t match schema: Error at "address": string doesn''t match the regular expression "^[1-9A-HJ-NP-Za-km-z]{32,44}$"'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: Solana account with the given address not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/accounts/by-name/{name}:
+    get:
+      x-audience: public
+      summary: Get a Solana account by name
+      description: Gets a Solana account by its name.
+      operationId: getSolanaAccountByName
+      tags:
+        - Solana Accounts
+      parameters:
+        - name: name
+          description: The name of the Solana account.
+          in: path
+          required: true
+          schema:
+            type: string
+          example: my-account
+      responses:
+        '200':
+          description: Successfully got Solana account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolanaAccount'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'error: parameter "name" must be a string'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: Solana account with the given name not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/accounts/{address}/sign/transaction:
+    post:
+      x-audience: public
+      summary: Sign a transaction
+      description: |-
+        Signs a transaction with the given Solana account.
+        The unsigned transaction should be serialized into a byte array and then encoded as base64.
+
+        **Transaction types**
+
+        The following transaction types are supported:
+        * [Legacy transactions](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html)
+        * [Versioned transactions](https://solana-labs.github.io/solana-web3.js/classes/VersionedTransaction.html)
+
+        The developer is responsible for ensuring that the unsigned transaction is valid, as the API will not validate the transaction.
+      operationId: signSolanaTransaction
+      tags:
+        - Solana Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: address
+          description: The base58 encoded address of the Solana account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[1-9A-HJ-NP-Za-km-z]{32,44}$
+          example: HpabPRRCFbBKSuJr5PdkVvQc85FyxyTWkFM2obBRSvHT
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction:
+                  type: string
+                  description: The base64 encoded transaction to sign.
+                  example: AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8CBgMBAQAAAAIBAwQAAAAABgIAAAAAAAYDBQEBAAAGBAgAAAAABgUAAAAA6AMAAAAAAAAGBgUBAQEBBgcEAQAAAAYICgMBAQIDBgkCBgAAAAYKAwABAQEGCwMGAQEBBgwDAAABAQAAAAA=
+              required:
+                - transaction
+      responses:
+        '200':
+          description: Successfully signed transaction.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedTransaction:
+                    type: string
+                    description: The base64 encoded signed transaction.
+                    example: AQACAdSOvpk0UJXs/rQRXYKSI9hcR0bkGp24qGv6t0/M1XjcQpHf6AHwLcPjEtKQI7p/U0Zo98lnJ5/PZMfVq/0BAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8CBgMBAQAAAAIBAwQAAAAABgIAAAAAAAYDBQEBAAAGBAgAAAAABgUAAAAA6AMAAAAAAAAGBgUBAQEBBgcEAQAAAAYICgMBAQIDBgkCBgAAAAYKAwABAQEGCwMGAQEBBgwDAAABAQAAAAA=
+                required:
+                  - signedTransaction
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                malformed_transaction:
+                  value:
+                    errorType: malformed_transaction
+                    errorMessage: Malformed unsigned transaction.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '403':
+          description: Access to resource forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                forbidden:
+                  value:
+                    errorType: forbidden
+                    errorMessage: Unable to sign transaction for this address.
+        '404':
+          description: Solana account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: Solana account with the given address not found.
+        '409':
+          $ref: '#/components/responses/AlreadyExistsError'
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/accounts/{address}/sign/message:
+    post:
+      x-audience: public
+      summary: Sign a message
+      description: |-
+        Signs an arbitrary message with the given Solana account.
+
+        **WARNING:** Never sign a message that you didn't generate, as it can be an arbitrary transaction. For example, it might send all of your funds to an attacker.
+      operationId: signSolanaMessage
+      tags:
+        - Solana Accounts
+      parameters:
+        - $ref: '#/components/parameters/XWalletAuth'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: address
+          description: The base58 encoded address of the Solana account.
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[1-9A-HJ-NP-Za-km-z]{32,44}$
+          example: HpabPRRCFbBKSuJr5PdkVvQc85FyxyTWkFM2obBRSvHT
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: The arbitrary message to sign.
+                  example: Hello, world!
+              required:
+                - message
+      responses:
+        '200':
+          description: Successfully signed message.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signature:
+                    type: string
+                    description: The signature of the message, as a base58 encoded string.
+                    example: 4YecmNqVT9QFqzuSvE9Zih3toZzNAijjXpj8xupgcC6E4VzwzFjuZBk5P99yz9JQaLRLm1K4L4FpMjxByFxQBe2h
+                required:
+                  - signature
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'request body has an error: doesn''t match schema: Error at "message": string doesn''t match the regular expression "^0x[0-9a-fA-F]{40}$"'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    errorType: unauthorized
+                    errorMessage: Wallet authentication error.
+        '404':
+          description: Solana account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    errorType: not_found
+                    errorMessage: Solana account with the given address not found.
+        '409':
+          $ref: '#/components/responses/AlreadyExistsError'
+        '422':
+          $ref: '#/components/responses/IdempotencyError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v2/solana/faucet:
+    post:
+      x-audience: public
+      summary: Request funds on Solana devnet
+      description: |
+        Request funds from the CDP Faucet on Solana devnet.
+
+        Faucets are available for SOL.
+
+        To prevent abuse, we enforce rate limits within a rolling 24-hour window to control the amount of funds that can be requested. 
+        These limits are applied at both the CDP User level and the blockchain address level. 
+        A single blockchain address cannot exceed the specified limits, even if multiple users submit requests to the same address.
+
+        | Token | Amount per Faucet Request |Rolling 24-hour window Rate Limits|
+        |:-----:|:-------------------------:|:--------------------------------:|
+        | SOL   | 0.00125 SOL               | 0.0125 SOL                       |
+      operationId: requestSolanaFaucet
+      tags:
+        - Faucets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address:
+                  type: string
+                  description: The address to request funds to, which is a base58-encoded string.
+                  pattern: ^[1-9A-HJ-NP-Za-km-z]{32,44}$
+                  example: HpabPRRCFbBKSuJr5PdkVvQc85FyxyTWkFM2obBRSvHT
+                token:
+                  type: string
+                  description: The token to request funds for.
+                  enum:
+                    - sol
+                    - usdc
+                  example: sol
+              required:
+                - address
+                - token
+      responses:
+        '200':
+          description: Successfully requested funds.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactionSignature:
+                    type: string
+                    description: The signature identifying the transaction that requested the funds.
+                    example: 4dje1d24iG2FfxwxTJJt8VSTtYXNc6AAuJwngtL97TJSqqPD3pgRZ7uh4szoU6WDrKyFTBgaswkDrCr7BqWjQqqK
+                required:
+                  - transactionSignature
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_address_format:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: 'request body has an error: doesn''t match schema: Error at "address": string doesn''t match the regular expression "^[1-9A-HJ-NP-Za-km-z]{32,44}$"'
+                invalid_request:
+                  value:
+                    errorType: invalid_request
+                    errorMessage: Unable to request faucet funds for this address.
+        '403':
+          description: Access to resource forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                forbidden:
+                  value:
+                    errorType: forbidden
+                    errorMessage: Unable to request faucet funds for this address.
+        '429':
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                faucet_limit_exceeded:
+                  value:
+                    errorType: faucet_limit_exceeded
+                    errorMessage: Faucet limit reached for this address. Please try again later.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A JWT signed using your API Key Secret, encoded in base64. Refer to the [Generate a Bearer Token](../docs/authentication#2-generate-a-bearer-token) section of our Authentication docs for information on how to generate your Bearer Token.
+  schemas:
+    EvmAccount:
+      type: object
+      properties:
+        address:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{40}$
+          description: The 0x-prefixed, checksum EVM address.
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+        name:
+          type: string
+          description: |-
+            An optional name for the account.
+            Account names can consist of alphanumeric characters and hyphens, and be between 2 and 36 characters long.
+            Account names are guaranteed to be unique across all EVM accounts in the developer's CDP Project.
+          example: my-account
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$
+      required:
+        - address
+    ListResponse:
+      type: object
+      properties:
+        nextPageToken:
+          type: string
+          description: The token for the next page of items, if any.
+          example: eyJsYXN0X2lkIjogImFiYzEyMyIsICJ0aW1lc3RhbXAiOiAxNzA3ODIzNzAxfQ==
+    ErrorType:
+      description: The code that indicates the type of error that occurred. These error codes can be used to determine how to handle the error.
+      type: string
+      example: invalid_request
+      enum:
+        - already_exists
+        - faucet_limit_exceeded
+        - forbidden
+        - idempotency_error
+        - internal_server_error
+        - invalid_request
+        - invalid_signature
+        - malformed_transaction
+        - not_found
+        - rate_limit_exceeded
+        - request_canceled
+        - timed_out
+        - unauthorized
+      x-error-instructions:
+        already_exists: |-
+          This error occurs when trying to create a resource that already exists.
+
+          **Steps to resolve:**
+          1. Check if the resource exists before creation
+          2. Use GET endpoints to verify resource state
+          4. Use unique identifiers/names for resources
+        faucet_limit_exceeded: |-
+          This error occurs when you've exceeded the faucet request limits.
+
+          **Steps to resolve:**
+          1. Wait for the time window to reset
+          2. Use funds more efficiently in your testing
+
+          For more information on faucet limits, please visit the [EVM Faucet endpoint](../reference/requestEvmFaucet) or the [Solana Faucet endpoint](../reference/requestSolFaucet).
+        forbidden: |-
+          This error occurs when you don't have permission to access the resource.
+
+          **Steps to resolve:**
+          1. Verify your permissions to access the resource
+          2. Ensure that you are the owner of the requested resource
+        idempotency_error: |-
+          This error occurs when an idempotency key is reused with different parameters.
+
+          **Steps to resolve:**
+          1. Generate a new UUID v4 for each unique request
+          2. Only reuse idempotency keys for exact request duplicates
+          3. Track used keys within your application
+
+          **Example idempotency key implementation:**
+          ```typescript
+          import { v4 as uuidv4 } from 'uuid';
+
+          function createIdempotencyKey() {
+            return uuidv4();
+          }
+          ```
+        internal_server_error: |-
+          This indicates an unexpected error that occurred on the CDP servers. 
+
+          **Important**: If you encounter this error, please note that your operation's status should be treated as unknown by your application, as it could have been a success within the CDP back-end.          
+
+          **Steps to resolve:**
+          1. Retry your request after a short delay
+          2. If persistent, contact CDP support with:
+             - Your correlation ID
+             - Timestamp of the error
+             - Request details
+          3. Consider implementing retry logic with an exponential backoff
+
+          **Note:** These errors are automatically logged and monitored by CDP.
+        invalid_request: |-
+          This error occurs when the request is malformed or contains invalid data, including issues with the request body, query parameters, path parameters, or headers.
+
+          **Steps to resolve:**
+          1. Check all required fields and parameters are present
+          2. Ensure request body (if applicable) follows the correct schema
+          3. Verify all parameter formats match the API specification:
+             - Query parameters
+             - Path parameters
+             - Request headers
+          4. Validate any addresses, IDs, or other formatted strings meet requirements
+
+          **Common validation issues:**
+          - Missing required parameters
+          - Invalid parameter types or formats
+          - Malformed JSON in request body
+          - Invalid enum values
+        invalid_signature: |-
+          This error occurs when the signature provided for the given user operation is invalid.
+
+          **Steps to resolve:**
+          1. Verify the signature was generated by the correct owner account
+          2. Ensure the signature corresponds to the exact user operation hash
+          3. Check that the signature format matches the expected format
+          4. Confirm you're using the correct network for the Smart Account
+
+          **Common causes:**
+          - Using wrong owner account to sign
+          - Signing modified/incorrect user operation data
+          - Malformed signature encoding
+          - Network mismatch between signature and broadcast
+        malformed_transaction: |-
+          This error occurs when the transaction data provided is not properly formatted or is invalid.
+
+          **Steps to resolve:**
+          1. Verify transaction encoding:
+             - **EVM networks**: Check RLP encoding is correct
+             - **Solana**: Validate base64 encoding
+          2. Ensure all required transaction fields are present
+          3. Validate transaction parameters are within acceptable ranges
+          4. Check that the transaction type is supported on the target network (see our [Supported Networks](./networks.mdx) page for more details)
+
+          **Common causes:**
+          - Invalid hex encoding for EVM transactions
+          - Missing required transaction fields
+          - Incorrect parameter formats
+          - Unsupported transaction types
+          - Network-specific transaction format mismatches 
+        not_found: |-
+          This error occurs when the resource specified in your request doesn't exist or you don't have access to it.
+
+          **Steps to resolve:**
+          1. Verify the resource ID/address/account exists
+          2. Check your permissions to access the resource
+          3. Ensure you're using the correct network/environment
+          4. Confirm the resource hasn't been deleted
+
+          **Common causes:**
+          - Mistyped addresses
+          - Accessing resources from the wrong CDP project
+          - Resource was deleted or hasn't been created yet
+        rate_limit_exceeded: |-
+          This error occurs when you've exceeded the API rate limits.
+
+          **Steps to resolve:**
+          1. Implement exponential backoff
+          2. Cache responses where possible
+          3. Wait for rate limit window to reset
+
+          **Best practices:**
+          ```typescript
+          async function withRetry(fn: () => Promise<any>) {
+            let delay = 1000;
+            while (true) {
+              try {
+                return await fn();
+              } catch (e) {
+                if (e.errorType === "rate_limit_exceeded") {
+                  await sleep(delay);
+                  delay *= 2;
+                  continue;
+                }
+                throw e;
+              }
+            }
+          }
+          ```
+        request_canceled: |-
+          This error occurs when the client cancels an in-progress request before it completes.
+
+          **Steps to resolve:**
+          1. Check client-side timeout configurations
+          2. Review request cancellation logic in your code
+          3. Consider increasing timeout thresholds for long-running operations
+          4. Implement request tracking to identify premature cancellations
+
+          **Best practices:**
+          ```typescript
+          async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+            const timeout = new Promise((_, reject) => {
+              setTimeout(() => {
+                reject(new Error("Operation timed out"));
+              }, timeoutMs);
+            });
+
+            try {
+              return await Promise.race([promise, timeout]);
+            } catch (error) {
+              // Handle timeout or cancellation
+              throw error;
+            }
+          }
+          ```
+        timed_out: |-
+          This error occurs when a request exceeds the maximum allowed processing time.
+
+          **Steps to resolve:**
+          1. Break down large requests into smaller chunks (if applicable)
+          2. Implement retry logic with exponential backoff
+          3. Use streaming endpoints for large data sets
+
+          **Example retry implementation:**
+          ```typescript
+          async function withRetryAndTimeout<T>(
+            operation: () => Promise<T>,
+            maxRetries = 3,
+            timeout = 30000,
+          ): Promise<T> {
+            let attempts = 0;
+            while (attempts < maxRetries) {
+              try {
+                return await Promise.race([
+                  operation(),
+                  new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Timeout")), timeout)
+                  ),
+                ]);
+              } catch (error) {
+                attempts++;
+                if (attempts === maxRetries) throw error;
+                // Exponential backoff
+                await new Promise(resolve => 
+                  setTimeout(resolve, Math.pow(2, attempts) * 1000)
+                );
+              }
+            }
+            throw new Error("Max retries exceeded");
+          }
+          ```
+        unauthorized: |-
+          This error occurs when authentication fails.
+
+          **Steps to resolve:**
+          1. Verify your CDP API credentials:
+             - Check that your API key is valid
+             - Check that your Wallet Secret is properly configured
+          2. Validate JWT token:
+             - Not expired
+             - Properly signed
+             - Contains required claims
+          3. Check request headers:
+             - Authorization header present
+             - X-Wallet-Auth header included when required
+
+          **Security note:** Never share your Wallet Secret or API keys.
+    Error:
+      description: An error response including the code for the type of error and a human-readable message describing the error.
+      type: object
+      properties:
+        errorType:
+          $ref: '#/components/schemas/ErrorType'
+        errorMessage:
+          description: The error message.
+          type: string
+          example: Unable to create EVM account
+        correlationId:
+          description: A unique identifier for the request that generated the error. This can be used to help debug issues with the API.
+          type: string
+          example: 41deb8d59a9dc9a7-IAD
+        errorLink:
+          description: A link to the corresponding error documentation.
+          type: string
+          example: https://docs.cdp.coinbase.com/api-v2/docs/errors#invalid_request
+      required:
+        - errorType
+        - errorMessage
+      example:
+        errorType: invalid_request
+        errorMessage: Invalid request.
+        correlationId: 41deb8d59a9dc9a7-IAD
+        errorLink: https://docs.cdp.coinbase.com/api-v2/docs/errors#invalid_request
+    EvmSmartAccount:
+      type: object
+      properties:
+        address:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{40}$
+          description: The 0x-prefixed, checksum address of the Smart Account.
+          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+        owners:
+          type: array
+          items:
+            type: string
+            pattern: ^0x[0-9a-fA-F]{40}$
+          description: Today, only a single owner can be set for a Smart Account, but this is an array to allow having multiple owners in the future. The address is a 0x-prefixed, checksum address.
+          example:
+            - '0xfc807D1bE4997e5C7B33E4d8D57e60c5b0f02B1a'
+        name:
+          type: string
+          description: |-
+            An optional name for the account.
+            Account names can consist of alphanumeric characters and hyphens, and be between 2 and 36 characters long.
+            Account names are guaranteed to be unique across all Smart Accounts in the developer's CDP Project.
+          example: my-smart-account
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$
+      required:
+        - address
+        - owners
+    EvmCall:
+      type: object
+      properties:
+        to:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{40}$
+          description: The address the call is directed to.
+          example: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+        value:
+          type: string
+          description: The amount of ETH to send with the call, in wei.
+          example: '0'
+        data:
+          type: string
+          pattern: ^0x[0-9a-fA-F]*$
+          description: The call data to send. This is the hex-encoded data of the function call consisting of the method selector and the function arguments.
+          example: '0xa9059cbb000000000000000000000000fc807d1be4997e5c7b33e4d8d57e60c5b0f02b1a0000000000000000000000000000000000000000000000000000000000000064'
+      required:
+        - to
+        - value
+        - data
+    EvmUserOperation:
+      type: object
+      properties:
+        network:
+          type: string
+          description: The network the user operation is for.
+          enum:
+            - base-sepolia
+            - base
+          example: base-sepolia
+        userOpHash:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{64}$
+          description: The hash of the user operation. This is not the transaction hash, as a transaction consists of multiple user operations. The user operation hash is the hash of this particular user operation which gets signed by the owner of the Smart Account.
+          example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+        calls:
+          type: array
+          description: The list of calls in the user operation.
+          items:
+            $ref: '#/components/schemas/EvmCall'
+          example:
+            - to: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+              value: '0'
+              data: '0xa9059cbb000000000000000000000000fc807d1be4997e5c7b33e4d8d57e60c5b0f02b1a0000000000000000000000000000000000000000000000000000000000000064'
+            - to: '0xdac17f958d2ee523a2206206994597c13d831ec7'
+              value: '1000000000000000'
+              data: 0x
+        status:
+          type: string
+          description: The status of the user operation.
+          enum:
+            - pending
+            - signed
+            - broadcast
+            - complete
+            - failed
+          example: pending
+        transactionHash:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{64}$|^$
+          description: The hash of the transaction that included this particular user operation. This gets set after the user operation is broadcasted and the transaction is included in a block.
+          example: '0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+      required:
+        - network
+        - userOpHash
+        - calls
+        - status
+    SolanaAccount:
+      type: object
+      properties:
+        address:
+          type: string
+          pattern: ^[1-9A-HJ-NP-Za-km-z]{32,44}$
+          description: The base58 encoded Solana address.
+          example: HpabPRRCFbBKSuJr5PdkVvQc85FyxyTWkFM2obBRSvHT
+        name:
+          type: string
+          description: |-
+            An optional name for the account.
+            Account names can consist of alphanumeric characters and hyphens, and be between 2 and 36 characters long.
+            Account names are guaranteed to be unique across all Solana accounts in the developer's CDP Project.
+          example: my-account
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$
+      required:
+        - address
+  responses:
+    InternalServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            internal_server_error:
+              value:
+                errorType: internal_server_error
+                errorMessage: An internal server error occurred. Please try again later.
+    IdempotencyError:
+      description: Idempotency key conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            idempotency_error:
+              value:
+                errorType: idempotency_error
+                errorMessage: Idempotency key '8e03978e-40d5-43e8-bc93-6894a57f9324' was already used with a different request payload. Please try again with a new idempotency key.
+    AlreadyExistsError:
+      description: The resource already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            idempotency_key_already_exists:
+              value:
+                errorType: already_exists
+                errorMessage: Another request with the same idempotency key is currently processing.
+  parameters:
+    XWalletAuth:
+      name: X-Wallet-Auth
+      in: header
+      required: true
+      description: |
+        A JWT signed using your Wallet Secret, encoded in base64. Refer to the [Generate a Wallet Token](../docs/authentication#3-generate-a-wallet-token) section of our Authentication docs for more details on how to generate your Wallet Token.
+      schema:
+        type: string
+      example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEyMywicm9sZSI6ImFkbWluIiwiZXhwIjoxNzAxOTgwMDAwfQ.HWvMTKmCCTxHaxjvZyLaC6UQ6TV3ErTDWBf7zmdH0Lw
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      description: |
+        An optional [UUID v4](https://www.uuidgenerator.net/version4) request header for making requests safely retryable.
+        When included, duplicate requests with the same key will return identical responses. 
+        Refer to our [Idempotency docs](../docs/idempotency) for more information on using idempotency keys.
+      schema:
+        type: string
+        maxLength: 36
+        minLength: 36
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+      example: 8e03978e-40d5-43e8-bc93-6894a57f9324

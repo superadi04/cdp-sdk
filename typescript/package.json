@@ -1,0 +1,76 @@
+{
+  "name": "@coinbase/cdp-sdk",
+  "version": "1.0.0",
+  "description": "CDP SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "lint": "eslint -c .eslintrc.json \"src/**/*.ts\"",
+    "lint:fix": "eslint -c .eslintrc.json \"src/**/*.ts\" --fix",
+    "format": "prettier -c .prettierrc --write \"**/*.{ts,js,cjs,json,md}\"",
+    "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\"",
+    "test": "vitest --config=./vitest.config.ts run",
+    "test:watch": "vitest --config=./vitest.config.ts",
+    "test:coverage": "vitest --config=./vitest.config.ts run --coverage",
+    "test:e2e": "pnpm build && vitest --config=./vitest.e2e.config.ts run",
+    "test:e2e:watch": "vitest --config=./vitest.e2e.config.ts",
+    "clean": "rm -rf dist/*",
+    "build": "tsc",
+    "prepack": "tsc --skipLibCheck",
+    "docs": "typedoc --entryPoints ./src --entryPointStrategy expand --exclude ./src/tests/**/*.ts",
+    "orval": "make -C .. check-openapi || echo \" NOTE: THERE IS A NEW OPENAPI FILE AVAILABLE. RUN 'make update-openapi' IN THE ROOT DIRECTORY TO UPDATE IT.\"; orval --config orval.config.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "coinbase",
+    "coinbase developer platform",
+    "coinbase sdk",
+    "cdp sdk",
+    "sdk",
+    "api"
+  ],
+  "author": "Coinbase Inc.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.5.2",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "abitype": "1.0.6",
+    "axios": "^1.8.2",
+    "jose": "^6.0.8",
+    "md5": "^2.3.0",
+    "viem": "^2.21.26"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/cli": "^2.28.1",
+    "@faker-js/faker": "^9.6.0",
+    "@types/node": "^20.12.11",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^1.4.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.7",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-jsdoc": "^48.11.0",
+    "eslint-plugin-prettier": "^5.2.5",
+    "msw": "^2.7.3",
+    "orval": "^7.6.0",
+    "prettier": "^3.2.5",
+    "tsx": "^4.19.3",
+    "typedoc": "^0.27.2",
+    "typescript": "^5.4.5",
+    "uuid": "^11.1.0",
+    "vitest": "^1.4.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
