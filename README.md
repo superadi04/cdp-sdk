@@ -23,6 +23,7 @@
 - [🚨 Security and Bug Reports](#-security-and-bug-reports)
 - [📧 Contact](#-contact)
 - [📚 SDK Docs](#-sdk-docs)
+- [✍️ Contributors](#-contributors)
 - [📝 License](#-license)
 
 ## 📖 Overview
@@ -67,6 +68,12 @@ CDP SDK has auto-generated SDK docs for each of the full-featured client librari
 - [TypeScript](https://coinbase.github.io/cdp-sdk/typescript)
 - [Python](https://coinbase.github.io/cdp-sdk/python)
 - [Go](https://coinbase.github.io/cdp-sdk/go)
+
+## ✍️ Contributors
+
+<a href="https://github.com/coinbase/cdp-sdk/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=coinbase/cdp-sdk" />
+</a>
 
 ## 📝 License
 
