@@ -244,7 +244,7 @@ async def test_create_get_and_list_solana_accounts(cdp_client):
 
     solana_accounts = await cdp_client.solana.list_accounts()
     assert solana_accounts is not None
-    assert len(solana_accounts) > 0
+    assert len(solana_accounts.accounts) > 0
 
     solana_account = await cdp_client.solana.get_account(solana_account.address)
     assert solana_account is not None
@@ -301,5 +301,6 @@ async def test_solana_sign_fns(cdp_client):
     )
 
     base64_tx = base64.b64encode(unsigned_tx_bytes).decode("utf-8")
-    signed_transaction = await cdp_client.solana.sign_transaction(account.address, base64_tx)
-    assert signed_transaction is not None
+    response = await cdp_client.solana.sign_transaction(account.address, base64_tx)
+    assert response is not None
+    assert response.signed_transaction is not None
