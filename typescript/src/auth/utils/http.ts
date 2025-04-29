@@ -62,6 +62,11 @@ export interface GetAuthHeadersOptions {
    * Optional expiration time in seconds (defaults to 120)
    */
   expiresIn?: number;
+
+  /**
+   * Optional audience claim for the JWT
+   */
+  audience?: string[];
 }
 
 /**
@@ -83,6 +88,7 @@ export async function getAuthHeaders(
     requestHost: options.requestHost,
     requestPath: options.requestPath,
     expiresIn: options.expiresIn,
+    audience: options.audience,
   });
   headers["Authorization"] = `Bearer ${jwt}`;
   headers["Content-Type"] = "application/json";
@@ -131,7 +137,7 @@ function requiresWalletAuth(requestMethod: string, requestPath: string): boolean
  * @param sourceVersion - The version of the source making the request
  * @returns Encoded correlation data as a query string
  */
-function getCorrelationData(source?: string, sourceVersion?: string): string {
+export function getCorrelationData(source?: string, sourceVersion?: string): string {
   const data = {
     sdk_version: version,
     sdk_language: "typescript",

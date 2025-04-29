@@ -15,8 +15,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// GenerateJWT generates a JWT (Bearer token) for authenticating with Coinbase's REST APIs
-// Supports both EC (ES256) and Ed25519 (EdDSA) keys.
+// GenerateJWT generates a JWT (Bearer token) for authenticating with Coinbase's APIs.
+// Supports both EC (ES256) and Ed25519 (EdDSA) keys. Also supports JWTs meant for
+// websocket connections by allowing RequestMethod, RequestHost, and RequestPath to all be
+// empty strings, in which case the 'uris' claim is omitted from the JWT.
 func GenerateJWT(options JwtOptions) (string, error) {
 	// Validate required parameters
 	if options.KeyID == "" {
@@ -25,8 +27,14 @@ func GenerateJWT(options JwtOptions) (string, error) {
 	if options.KeySecret == "" {
 		return "", errors.New("private key is required")
 	}
-	if options.RequestMethod == "" || options.RequestHost == "" || options.RequestPath == "" {
-		return "", errors.New("request details (method, host, path) are required")
+
+	// Check if we have a REST API request or a websocket connection
+	hasAllRequestParams := options.RequestMethod != "" && options.RequestHost != "" && options.RequestPath != ""
+	hasNoRequestParams := options.RequestMethod == "" && options.RequestHost == "" && options.RequestPath == ""
+
+	// Ensure we either have all request parameters or none (for websocket)
+	if !hasAllRequestParams && !hasNoRequestParams {
+		return "", errors.New("either all request details (method, host, path) must be provided, or all must be empty for JWTs intended for websocket connections")
 	}
 
 	// Set default expiration if not specified
@@ -35,7 +43,12 @@ func GenerateJWT(options JwtOptions) (string, error) {
 	}
 
 	now := time.Now()
-	uri := fmt.Sprintf("%s %s%s", options.RequestMethod, options.RequestHost, options.RequestPath)
+
+	// Generate URI for REST API requests
+	var uri string
+	if hasAllRequestParams {
+		uri = fmt.Sprintf("%s %s%s", options.RequestMethod, options.RequestHost, options.RequestPath)
+	}
 
 	// Generate random nonce
 	nonceBytes := make([]byte, 16)
@@ -43,11 +56,32 @@ func GenerateJWT(options JwtOptions) (string, error) {
 		return "", fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	// Determine key type and build JWT accordingly
+	// Create common claims
+	claims := jwt.MapClaims{
+		"sub": options.KeyID,
+		"iss": "cdp",
+		"nbf": now.Unix(),
+		"iat": now.Unix(),
+		"exp": now.Add(time.Duration(options.ExpiresIn) * time.Second).Unix(),
+	}
+
+	// Use provided audience if available, otherwise default to ["cdp_service"]
+	if len(options.Audience) > 0 {
+		claims["aud"] = options.Audience
+	} else {
+		claims["aud"] = []string{"cdp_service"}
+	}
+
+	// Add the uris claim only for REST API requests, not for websocket connections
+	if uri != "" {
+		claims["uris"] = []string{uri}
+	}
+
+	// Create and sign JWT based on key type
 	if isValidECKey(options.KeySecret) {
-		return buildECJWT(options, uri, now, nonceBytes)
+		return buildECJWT(options, claims, nonceBytes)
 	} else if isValidEd25519Key(options.KeySecret) {
-		return buildEdwardsJWT(options, uri, now, nonceBytes)
+		return buildEdwardsJWT(options, claims, nonceBytes)
 	}
 
 	return "", errors.New("invalid key format - must be either PEM EC key or base64 Ed25519 key")
@@ -138,7 +172,7 @@ func isValidECKey(str string) bool {
 }
 
 // buildECJWT builds a JWT using an EC key.
-func buildECJWT(options JwtOptions, uri string, now time.Time, nonce []byte) (string, error) {
+func buildECJWT(options JwtOptions, claims jwt.MapClaims, nonce []byte) (string, error) {
 	// Parse the private key
 	block, _ := pem.Decode([]byte(options.KeySecret))
 	if block == nil {
@@ -148,17 +182,6 @@ func buildECJWT(options JwtOptions, uri string, now time.Time, nonce []byte) (st
 	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse EC private key: %w", err)
-	}
-
-	// Create the claims
-	claims := jwt.MapClaims{
-		"sub":  options.KeyID,
-		"iss":  "cdp",
-		"aud":  []string{"cdp_service"},
-		"uris": []string{uri},
-		"nbf":  now.Unix(),
-		"iat":  now.Unix(),
-		"exp":  now.Add(time.Duration(options.ExpiresIn) * time.Second).Unix(),
 	}
 
 	// Create the token
@@ -176,7 +199,7 @@ func buildECJWT(options JwtOptions, uri string, now time.Time, nonce []byte) (st
 }
 
 // buildEdwardsJWT builds a JWT using an Ed25519 key.
-func buildEdwardsJWT(options JwtOptions, uri string, now time.Time, nonce []byte) (string, error) {
+func buildEdwardsJWT(options JwtOptions, claims jwt.MapClaims, nonce []byte) (string, error) {
 	// Decode the base64 key
 	decoded, err := base64.StdEncoding.DecodeString(options.KeySecret)
 	if err != nil {
@@ -189,17 +212,6 @@ func buildEdwardsJWT(options JwtOptions, uri string, now time.Time, nonce []byte
 
 	// Extract private key
 	privateKey := ed25519.PrivateKey(decoded)
-
-	// Create the claims
-	claims := jwt.MapClaims{
-		"sub":  options.KeyID,
-		"iss":  "cdp",
-		"aud":  []string{"cdp_service"},
-		"uris": []string{uri},
-		"nbf":  now.Unix(),
-		"iat":  now.Unix(),
-		"exp":  now.Add(time.Duration(options.ExpiresIn) * time.Second).Unix(),
-	}
 
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
