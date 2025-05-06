@@ -1,7 +1,8 @@
 # Usage: 
-# uv run python solana/send_transaction.py
+# uv run python solana/send_batch_transaction.py
 #   [--sender <sender_address>] - optional, if not provided, a new account will be created and funded from the faucet
-#   [--destination <destination_address>] - optional, if not provided, a default destination address will be used
+#   [--destinations <destination_addresses>] - optional, a comma separated list of destination addresses.
+#                                              If not a default set of destination addresses will be used.
 #   [--amount <amount_in_lamports>] - optional, if not provided, a default amount of 1000 lamports will be used
 
 import argparse
@@ -71,26 +72,29 @@ async def wait_for_balance(connection: SolanaClient, address: str):
 async def send_transaction(
     cdp: CdpClient,
     sender_address: str,
-    destination_address: str,
+    destination_addresses: list[str],
     amount: int = 1000,
 ):
     connection = SolanaClient("https://api.devnet.solana.com")
 
     source_pubkey = PublicKey.from_string(sender_address)
-    dest_pubkey = PublicKey.from_string(destination_address)
+    dest_pubkeys = [PublicKey.from_string(address) for address in destination_addresses]
 
-    print(f"Preparing to send {amount} lamports from {sender_address} to {destination_address}")
+    print(f"Preparing to send {amount} lamports each to {len(destination_addresses)} addresses from {sender_address}")
 
     blockhash_resp = connection.get_latest_blockhash()
     blockhash = blockhash_resp.value.blockhash
 
-    transfer_params = TransferParams(
-        from_pubkey=source_pubkey, to_pubkey=dest_pubkey, lamports=amount
-    )
-    transfer_instr = transfer(transfer_params)
+    transfer_param_list = [
+        TransferParams(
+            from_pubkey=source_pubkey, to_pubkey=dest_pubkey, lamports=amount
+        )
+        for dest_pubkey in dest_pubkeys
+    ]
+    transfer_instr_list = [transfer(transfer_param) for transfer_param in transfer_param_list]
 
     message = Message.new_with_blockhash(
-        [transfer_instr],
+        transfer_instr_list,
         source_pubkey,
         blockhash,
     )
@@ -152,8 +156,8 @@ async def main():
         help="Sender address (if not provided, a new account will be created)",
     )
     parser.add_argument(
-        "--destination",
-        default="3KzDtddx4i53FBkvCzuDmRbaMozTZoJBb1TToWhz3JfE",
+        "--destinations",
+        default="ANVUJaJoVaJZELtV2AvRp7V5qPV1B84o29zAwDhPj1c2,EeVPcnRE1mhcY85wAh3uPJG1uFiTNya9dCJjNUPABXzo,4PkiqJkUvxr9P8C1UsMqGN8NJsUcep9GahDRLfmeu8UK",
         help="Destination address",
     )
     parser.add_argument(
@@ -189,7 +193,7 @@ async def main():
                     await request_faucet(cdp, sender_address)
                     await wait_for_balance(connection, sender_address)
 
-            await send_transaction(cdp, sender_address, args.destination, args.amount)
+            await send_transaction(cdp, sender_address, args.destinations.split(","), args.amount)
 
         except Exception as error:
             print(f"Error in process: {error}")

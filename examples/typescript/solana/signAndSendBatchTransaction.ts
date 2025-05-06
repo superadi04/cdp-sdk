@@ -1,4 +1,4 @@
-// Usage: pnpm tsx solana/signAndSendTransaction.ts [sourceAddress]
+// Usage: pnpm tsx solana/signAndSendBatchTransaction.ts [sourceAddress]
 
 import { CdpClient } from "@coinbase/cdp-sdk";
 
@@ -13,7 +13,7 @@ import {
  * This script will:
  * 1. Either use a provided Solana address or create a new one
  * 2. If a new account is created, requests SOL from CDP faucet
- * 3. Signs a transaction with CDP to send SOL to a destination address
+ * 3. Signs a transaction with CDP to send SOL to a set of destination addresses
  * 4. Broadcasts the signed transaction
  *
  * @param {string} [sourceAddress] - The source address to use
@@ -22,8 +22,12 @@ import {
 async function main(sourceAddress?: string) {
   const cdp = new CdpClient();
 
-  // Required: Destination address to send SOL to
-  const destinationAddress = "3KzDtddx4i53FBkvCzuDmRbaMozTZoJBb1TToWhz3JfE";
+  // Required: Destination addresses to batch send SOL to
+  const destinationAddresses = [
+    "ANVUJaJoVaJZELtV2AvRp7V5qPV1B84o29zAwDhPj1c2",
+    "EeVPcnRE1mhcY85wAh3uPJG1uFiTNya9dCJjNUPABXzo",
+    "4PkiqJkUvxr9P8C1UsMqGN8NJsUcep9GahDRLfmeu8UK",
+  ];
 
   // Amount of lamports to send (default: 1000 = 0.000001 SOL)
   const lamportsToSend = 1000;
@@ -82,14 +86,16 @@ async function main(sourceAddress?: string) {
 
     const { blockhash } = await connection.getLatestBlockhash();
 
+    // Add instructions to transfer SOL to each destination address
     const transaction = new Transaction();
-    transaction.add(
+    const instructions = destinationAddresses.map((destinationAddress) =>
       SystemProgram.transfer({
         fromPubkey: new PublicKey(fromAddress),
         toPubkey: new PublicKey(destinationAddress),
         lamports: lamportsToSend,
       })
     );
+    transaction.add(...instructions);
 
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = new PublicKey(fromAddress);
@@ -134,7 +140,7 @@ async function main(sourceAddress?: string) {
 
     return {
       fromAddress,
-      destinationAddress,
+      destinationAddresses,
       amount: lamportsToSend / 1e9,
       signature,
       success: !confirmation.value.err,
