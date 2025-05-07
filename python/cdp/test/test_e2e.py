@@ -156,6 +156,44 @@ async def test_send_wait_and_get_user_operation(cdp_client):
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
+async def test_send_wait_and_get_user_operation_with_smart_account(cdp_client):
+    """Test sending, waiting for, and getting a user operation with a smart account."""
+    private_key = Account.create().key
+    owner = Account.from_key(private_key)
+
+    smart_account = await cdp_client.evm.create_smart_account(owner=owner)
+    assert smart_account is not None
+
+    user_operation = await smart_account.send_user_operation(
+        network="base-sepolia",
+        calls=[
+            EncodedCall(
+                to="0x0000000000000000000000000000000000000000",
+                data="0x",
+                value=0,
+            )
+        ],
+    )
+
+    assert user_operation is not None
+    assert user_operation.user_op_hash is not None
+
+    user_op_result = await smart_account.wait_for_user_operation(
+        user_op_hash=user_operation.user_op_hash,
+    )
+
+    assert user_op_result is not None
+    assert user_op_result.status == "complete"
+
+    user_op = await smart_account.get_user_operation(
+        user_op_hash=user_operation.user_op_hash,
+    )
+    assert user_op is not None
+    assert user_op.status == "complete"
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
 async def test_send_transaction(cdp_client):
     """Test sending a transaction."""
     account = await cdp_client.evm.get_account(name="E2EServerAccount")
@@ -175,6 +213,84 @@ async def test_send_transaction(cdp_client):
 
     tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     assert tx_receipt is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_send_transaction_from_account(cdp_client):
+    """Test sending a transaction from an account."""
+    account = await cdp_client.evm.get_account(name="E2EServerAccount")
+    assert account is not None
+
+    await _ensure_sufficient_eth_balance(cdp_client, account)
+
+    # test that account can send a TransactionRequestEIP1559
+    tx_hash = await account.send_transaction(
+        transaction=TransactionRequestEIP1559(
+            to="0x0000000000000000000000000000000000000000",
+            value=w3.to_wei(0, "ether"),
+        ),
+        network="base-sepolia",
+    )
+
+    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    assert tx_receipt is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_evm_request_faucet_for_account(cdp_client):
+    """Test requesting a faucet for an EVM account."""
+    account = await cdp_client.evm.create_account()
+    assert account is not None
+
+    faucet_hash = await account.request_faucet(network="base-sepolia", token="eth")
+    assert faucet_hash is not None
+
+    tx_receipt = w3.eth.wait_for_transaction_receipt(faucet_hash)
+    assert tx_receipt is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_list_evm_token_balances_for_account(cdp_client):
+    """Test listing evm token balances for a server account."""
+    account = await cdp_client.evm.get_or_create_account(name="E2ETestAccount")
+    assert account is not None
+
+    first_page = await account.list_token_balances(network="base-sepolia", page_size=1)
+    assert first_page is not None
+    assert len(first_page.balances) > 0
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_evm_request_faucet_for_smart_account(cdp_client):
+    """Test requesting a faucet for an EVM smart account."""
+    smart_account = await cdp_client.evm.create_smart_account(owner=Account.create())
+    assert smart_account is not None
+
+    faucet_hash = await smart_account.request_faucet(network="base-sepolia", token="eth")
+    assert faucet_hash is not None
+
+    tx_receipt = w3.eth.wait_for_transaction_receipt(faucet_hash)
+    assert tx_receipt is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_list_evm_token_balances_for_smart_account(cdp_client):
+    """Test listing evm token balances for a smart account."""
+    account = await cdp_client.evm.get_or_create_account(name="E2ESmartAccount")
+    assert account is not None
+
+    smart_account = await cdp_client.evm.get_smart_account(
+        address="0x283C298d11dE680843591AE8b43E3cB093B44Aca", owner=account
+    )
+
+    first_page = await smart_account.list_token_balances(network="base-sepolia")
+    assert first_page is not None
+    assert len(first_page.balances) > 0
 
 
 @pytest.mark.e2e

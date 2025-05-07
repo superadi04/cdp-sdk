@@ -1,8 +1,15 @@
 from eth_account.signers.base import BaseAccount
 from pydantic import BaseModel, ConfigDict, Field
 
+from cdp.actions.evm.list_token_balances import list_token_balances
+from cdp.actions.evm.request_faucet import request_faucet
+from cdp.actions.evm.send_user_operation import send_user_operation
+from cdp.actions.evm.wait_for_user_operation import wait_for_user_operation
 from cdp.api_clients import ApiClients
+from cdp.evm_call_types import ContractCall
+from cdp.evm_token_balances import ListTokenBalancesResult
 from cdp.openapi_client.models.evm_smart_account import EvmSmartAccount as EvmSmartAccountModel
+from cdp.openapi_client.models.evm_user_operation import EvmUserOperation as EvmUserOperationModel
 
 
 class EvmSmartAccount(BaseModel):
@@ -157,6 +164,118 @@ class EvmSmartAccount(BaseModel):
             from_account=self,
             transfer_args=transfer_args,
             transfer_strategy=smart_account_transfer_strategy,
+        )
+
+    async def list_token_balances(
+        self,
+        network: str,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> ListTokenBalancesResult:
+        """List the token balances for the smart account on the given network.
+
+        Args:
+            network (str): The network to list the token balances for.
+            page_size (int, optional): The number of token balances to return per page. Defaults to None.
+            page_token (str, optional): The token for the next page of token balances, if any. Defaults to None.
+
+        Returns:
+            [ListTokenBalancesResult]: The token balances for the smart account on the network.
+
+        """
+        return await list_token_balances(
+            self.__api_clients.evm_token_balances,
+            self.address,
+            network,
+            page_size,
+            page_token,
+        )
+
+    async def request_faucet(
+        self,
+        network: str,
+        token: str,
+    ) -> str:
+        """Request a token from the faucet.
+
+        Args:
+            network (str): The network to request the faucet for.
+            token (str): The token to request the faucet for.
+
+        Returns:
+            str: The transaction hash of the faucet request.
+
+        """
+        return await request_faucet(
+            self.__api_clients.faucets,
+            self.address,
+            network,
+            token,
+        )
+
+    async def send_user_operation(
+        self,
+        calls: list[ContractCall],
+        network: str,
+        paymaster_url: str | None = None,
+    ) -> EvmUserOperationModel:
+        """Send a user operation for the smart account.
+
+        Args:
+            calls (List[ContractCall]): The calls to send.
+            network (str): The network.
+            paymaster_url (str): The paymaster URL.
+
+        Returns:
+            EvmUserOperationModel: The user operation model.
+
+        """
+        return await send_user_operation(
+            self.__api_clients,
+            self.address,
+            self.owners[0],
+            calls,
+            network,
+            paymaster_url,
+        )
+
+    async def wait_for_user_operation(
+        self,
+        user_op_hash: str,
+        timeout_seconds: float = 20,
+        interval_seconds: float = 0.2,
+    ) -> EvmUserOperationModel:
+        """Wait for a user operation to be processed.
+
+        Args:
+            user_op_hash (str): The hash of the user operation to wait for.
+            timeout_seconds (float, optional): Maximum time to wait in seconds. Defaults to 20.
+            interval_seconds (float, optional): Time between checks in seconds. Defaults to 0.2.
+
+        Returns:
+            EvmUserOperationModel: The user operation model.
+
+        """
+        return await wait_for_user_operation(
+            self.__api_clients,
+            self.address,
+            user_op_hash,
+            timeout_seconds,
+            interval_seconds,
+        )
+
+    async def get_user_operation(self, user_op_hash: str) -> EvmUserOperationModel:
+        """Get a user operation for the smart account by hash.
+
+        Args:
+            user_op_hash (str): The hash of the user operation to get.
+
+        Returns:
+            EvmUserOperationModel: The user operation model.
+
+        """
+        return await self.__api_clients.evm_smart_accounts.get_user_operation(
+            self.address, user_op_hash
         )
 
     def __str__(self) -> str:
