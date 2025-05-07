@@ -1,7 +1,6 @@
-import {
-  OpenApiSolanaMethods,
-  SolanaAccount as OpenAPISolanaAccount,
-} from "../../openapi-client/index.js";
+import { Account, SolanaAccount } from "../../accounts/solana/types.js";
+import { OpenApiSolanaMethods } from "../../openapi-client/index.js";
+
 /**
  * The SolanaClient type, where all OpenApiSolanaMethods methods are wrapped.
  */
@@ -23,10 +22,14 @@ export type SolanaClientInterface = Omit<
   signMessage: (options: SignMessageOptions) => Promise<SignatureResult>;
   signTransaction: (options: SignTransactionOptions) => Promise<SignatureResult>;
 };
+
 /**
- * A Solana account.
+ * A Solana signature result.
  */
-export type Account = OpenAPISolanaAccount;
+export interface SignatureResult {
+  /** The signature. */
+  signature: string;
+}
 
 /**
  * Options for creating a Solana account.
@@ -71,7 +74,7 @@ export interface ListAccountsOptions {
  */
 export interface ListAccountsResult {
   /** The accounts. */
-  accounts: Account[];
+  accounts: SolanaAccount[];
   /**
    * The token for the next page of accounts, if any.
    */
@@ -112,12 +115,4 @@ export interface SignTransactionOptions {
   transaction: string;
   /** The idempotency key. */
   idempotencyKey?: string;
-}
-
-/**
- * A Solana signature result.
- */
-export interface SignatureResult {
-  /** The signature. */
-  signature: string;
 }

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, MockedFunction } from "vitest";
+import { beforeEach, describe, expect, it, MockedFunction, vi } from "vitest";
 
 import { CdpOpenApiClient } from "../../openapi-client/index.js";
 
-import { SolanaClient } from "./solana.js";
 import { APIError } from "../../openapi-client/errors.js";
+import { SolanaClient } from "./solana.js";
 
 vi.mock("../../openapi-client/index.js", () => {
   return {
@@ -37,7 +37,12 @@ describe("SolanaClient", () => {
       });
 
       const result = await client.createAccount();
-      expect(result).toEqual({ address: "cdpSolanaAccount" });
+      expect(result).toEqual({
+        address: "cdpSolanaAccount",
+        requestFaucet: expect.any(Function),
+        signMessage: expect.any(Function),
+        signTransaction: expect.any(Function),
+      });
     });
   });
 
@@ -51,7 +56,12 @@ describe("SolanaClient", () => {
       });
 
       const result = await client.getAccount({ address: "cdpSolanaAccount" });
-      expect(result).toEqual({ address: "cdpSolanaAccount" });
+      expect(result).toEqual({
+        address: "cdpSolanaAccount",
+        requestFaucet: expect.any(Function),
+        signMessage: expect.any(Function),
+        signTransaction: expect.any(Function),
+      });
     });
 
     it("should get a Solana account by name", async () => {
@@ -63,7 +73,12 @@ describe("SolanaClient", () => {
       });
 
       const result = await client.getAccount({ name: "cdpSolanaAccount" });
-      expect(result).toEqual({ address: "cdpSolanaAccount" });
+      expect(result).toEqual({
+        address: "cdpSolanaAccount",
+        requestFaucet: expect.any(Function),
+        signMessage: expect.any(Function),
+        signTransaction: expect.any(Function),
+      });
     });
 
     it("should throw an error if neither address nor name is provided", async () => {
@@ -93,8 +108,18 @@ describe("SolanaClient", () => {
 
       const result = await client.getOrCreateAccount({ name: "cdpSolanaAccount" });
       const result2 = await client.getOrCreateAccount({ name: "cdpSolanaAccount" });
-      expect(result).toEqual({ address: "cdpSolanaAccount" });
-      expect(result2).toEqual({ address: "cdpSolanaAccount" });
+      expect(result).toEqual({
+        address: "cdpSolanaAccount",
+        requestFaucet: expect.any(Function),
+        signMessage: expect.any(Function),
+        signTransaction: expect.any(Function),
+      });
+      expect(result2).toEqual({
+        address: "cdpSolanaAccount",
+        requestFaucet: expect.any(Function),
+        signMessage: expect.any(Function),
+        signTransaction: expect.any(Function),
+      });
       expect(getSolanaAccountByNameMock).toHaveBeenCalledTimes(2);
       expect(createSolanaAccountMock).toHaveBeenCalledTimes(1);
     });
@@ -110,7 +135,16 @@ describe("SolanaClient", () => {
       });
 
       const result = await client.listAccounts();
-      expect(result).toEqual({ accounts: [{ address: "cdpSolanaAccount" }] });
+      expect(result).toEqual({
+        accounts: [
+          {
+            address: "cdpSolanaAccount",
+            requestFaucet: expect.any(Function),
+            signMessage: expect.any(Function),
+            signTransaction: expect.any(Function),
+          },
+        ],
+      });
     });
   });
 
@@ -150,6 +184,55 @@ describe("SolanaClient", () => {
   });
 
   describe("signTransaction", () => {
+    it("should sign a Solana transaction", async () => {
+      const signSolanaTransactionMock = CdpOpenApiClient.signSolanaTransaction as MockedFunction<
+        typeof CdpOpenApiClient.signSolanaTransaction
+      >;
+
+      signSolanaTransactionMock.mockResolvedValue({
+        signedTransaction: "someSignature",
+      });
+
+      const result = await client.signTransaction({
+        address: "cdpSolanaAccount",
+        transaction: "someTransaction",
+      });
+      expect(result).toEqual({ signature: "someSignature" });
+    });
+  });
+
+  describe("Account Actions", () => {
+    it("should request faucet funds", async () => {
+      const requestSolanaFaucetMock = CdpOpenApiClient.requestSolanaFaucet as MockedFunction<
+        typeof CdpOpenApiClient.requestSolanaFaucet
+      >;
+      requestSolanaFaucetMock.mockResolvedValue({
+        transactionSignature: "someTransactionSignature",
+      });
+
+      const result = await client.requestFaucet({
+        address: "cdpSolanaAccount",
+        token: "sol",
+      });
+      expect(result).toEqual({ signature: "someTransactionSignature" });
+    });
+
+    it("should sign a Solana message", async () => {
+      const signSolanaMessageMock = CdpOpenApiClient.signSolanaMessage as MockedFunction<
+        typeof CdpOpenApiClient.signSolanaMessage
+      >;
+
+      signSolanaMessageMock.mockResolvedValue({
+        signature: "someSignature",
+      });
+
+      const result = await client.signMessage({
+        address: "cdpSolanaAccount",
+        message: "someMessage",
+      });
+      expect(result).toEqual({ signature: "someSignature" });
+    });
+
     it("should sign a Solana transaction", async () => {
       const signSolanaTransactionMock = CdpOpenApiClient.signSolanaTransaction as MockedFunction<
         typeof CdpOpenApiClient.signSolanaTransaction

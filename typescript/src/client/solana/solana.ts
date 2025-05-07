@@ -1,16 +1,20 @@
 import {
-  SolanaClientInterface,
-  Account,
   CreateAccountOptions,
   GetAccountOptions,
+  GetOrCreateAccountOptions,
   ListAccountsOptions,
-  RequestFaucetOptions,
   ListAccountsResult,
+  RequestFaucetOptions,
   SignatureResult,
   SignMessageOptions,
   SignTransactionOptions,
-  GetOrCreateAccountOptions,
+  SolanaClientInterface,
 } from "./solana.types.js";
+import { toSolanaAccount } from "../../accounts/solana/toSolanaAccount.js";
+import { SolanaAccount } from "../../accounts/solana/types.js";
+import { requestFaucet } from "../../actions/solana/requestFaucet.js";
+import { signMessage } from "../../actions/solana/signMessage.js";
+import { signTransaction } from "../../actions/solana/signTransaction.js";
 import { APIError } from "../../openapi-client/errors.js";
 import { CdpOpenApiClient } from "../../openapi-client/index.js";
 
@@ -48,8 +52,12 @@ export class SolanaClient implements SolanaClientInterface {
    *          await cdp.solana.createAccount({ idempotencyKey });
    *          ```
    */
-  async createAccount(options: CreateAccountOptions = {}): Promise<Account> {
-    return CdpOpenApiClient.createSolanaAccount(options, options.idempotencyKey);
+  async createAccount(options: CreateAccountOptions = {}): Promise<SolanaAccount> {
+    const account = await CdpOpenApiClient.createSolanaAccount(options, options.idempotencyKey);
+
+    return toSolanaAccount(CdpOpenApiClient, {
+      account,
+    });
   }
 
   /**
@@ -77,13 +85,19 @@ export class SolanaClient implements SolanaClientInterface {
    *          });
    *          ```
    */
-  async getAccount(options: GetAccountOptions): Promise<Account> {
+  async getAccount(options: GetAccountOptions): Promise<SolanaAccount> {
     if (options.address) {
-      return CdpOpenApiClient.getSolanaAccount(options.address);
+      const account = await CdpOpenApiClient.getSolanaAccount(options.address);
+      return toSolanaAccount(CdpOpenApiClient, {
+        account,
+      });
     }
 
     if (options.name) {
-      return CdpOpenApiClient.getSolanaAccountByName(options.name);
+      const account = await CdpOpenApiClient.getSolanaAccountByName(options.name);
+      return toSolanaAccount(CdpOpenApiClient, {
+        account,
+      });
     }
 
     throw new Error("Either address or name must be provided");
@@ -104,7 +118,7 @@ export class SolanaClient implements SolanaClientInterface {
    * });
    * ```
    */
-  async getOrCreateAccount(options: GetOrCreateAccountOptions): Promise<Account> {
+  async getOrCreateAccount(options: GetOrCreateAccountOptions): Promise<SolanaAccount> {
     try {
       const account = await this.getAccount(options);
       return account;
@@ -165,7 +179,11 @@ export class SolanaClient implements SolanaClientInterface {
     });
 
     return {
-      accounts: solAccounts.accounts,
+      accounts: solAccounts.accounts.map(account =>
+        toSolanaAccount(CdpOpenApiClient, {
+          account,
+        }),
+      ),
       nextPageToken: solAccounts.nextPageToken,
     };
   }
@@ -189,14 +207,7 @@ export class SolanaClient implements SolanaClientInterface {
    *          ```
    */
   async requestFaucet(options: RequestFaucetOptions): Promise<SignatureResult> {
-    const signature = await CdpOpenApiClient.requestSolanaFaucet(
-      { address: options.address, token: options.token },
-      options.idempotencyKey,
-    );
-
-    return {
-      signature: signature.transactionSignature,
-    };
+    return requestFaucet(CdpOpenApiClient, options);
   }
 
   /**
@@ -222,13 +233,7 @@ export class SolanaClient implements SolanaClientInterface {
    * ```
    */
   async signMessage(options: SignMessageOptions): Promise<SignatureResult> {
-    return CdpOpenApiClient.signSolanaMessage(
-      options.address,
-      {
-        message: options.message,
-      },
-      options.idempotencyKey,
-    );
+    return signMessage(CdpOpenApiClient, options);
   }
 
   /**
@@ -265,16 +270,6 @@ export class SolanaClient implements SolanaClientInterface {
    * ```
    */
   async signTransaction(options: SignTransactionOptions): Promise<SignatureResult> {
-    const signature = await CdpOpenApiClient.signSolanaTransaction(
-      options.address,
-      {
-        transaction: options.transaction,
-      },
-      options.idempotencyKey,
-    );
-
-    return {
-      signature: signature.signedTransaction,
-    };
+    return signTransaction(CdpOpenApiClient, options);
   }
 }
