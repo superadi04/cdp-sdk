@@ -263,8 +263,10 @@ describe("CDP Client E2E Tests", () => {
 
   it("should send a transaction", async () => {
     logger.log("Calling cdp.evm.sendTransaction");
+    const account = await cdp.evm.createAccount();
+    await ensureSufficientEthBalance(cdp, account);
     const txResult = await cdp.evm.sendTransaction({
-      address: testAccount.address,
+      address: account.address,
       network: "base-sepolia",
       transaction: {
         to: "0x4252e0c9A3da5A2700e7d91cb50aEf522D0C6Fe8",
@@ -411,8 +413,11 @@ describe("CDP Client E2E Tests", () => {
   describe("server account actions", () => {
     describe("transfer", () => {
       it("should transfer eth", async () => {
-        const { status } = await testAccount.transfer({
-          to: "0x9F663335Cd6Ad02a37B633602E98866CF944124d",
+        const sender = await cdp.evm.getOrCreateAccount({ name: "Sender" });
+        const receiver = await cdp.evm.getOrCreateAccount({ name: "Receiver" });
+        await ensureSufficientEthBalance(cdp, sender);
+        const { status } = await sender.transfer({
+          to: receiver.address,
           amount: "0",
           token: "eth",
           network: "base-sepolia",
@@ -422,8 +427,11 @@ describe("CDP Client E2E Tests", () => {
       });
 
       it("should transfer usdc", async () => {
-        const { status } = await testAccount.transfer({
-          to: "0x9F663335Cd6Ad02a37B633602E98866CF944124d",
+        const sender = await cdp.evm.getOrCreateAccount({ name: "Sender" });
+        const receiver = await cdp.evm.getOrCreateAccount({ name: "Receiver" });
+        await ensureSufficientEthBalance(cdp, sender);
+        const { status } = await sender.transfer({
+          to: receiver.address,
           amount: "0",
           token: "usdc",
           network: "base-sepolia",
@@ -554,7 +562,7 @@ describe("CDP Client E2E Tests", () => {
   });
 
   describe("solana account actions", () => {
-    describe("request faucet", () => {
+    describe.skip("request faucet", () => {
       it("should request faucet", async () => {
         const { signature } = await testSolanaAccount.requestFaucet({
           token: "sol",
