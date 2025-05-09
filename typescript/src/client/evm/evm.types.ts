@@ -23,7 +23,7 @@ import type {
   OpenApiEvmMethods,
 } from "../../openapi-client/index.js";
 import type { Calls } from "../../types/calls.js";
-import type { Address, Hex } from "../../types/misc.js";
+import type { Address, EIP712Message, Hex } from "../../types/misc.js";
 import type { WaitOptions } from "../../utils/wait.js";
 
 /**
@@ -46,6 +46,7 @@ export type EvmClientInterface = Omit<
   | "signEvmHash" // mapped to signHash
   | "signEvmMessage" // mapped to signMessage
   | "signEvmTransaction" // mapped to signTransaction
+  | "signEvmTypedData" // mapped to signTypedData
   | "sendEvmTransaction" // mapped to sendTransaction
   | "signEvmTypedData" // mapped to signTypedData
   | "updateEvmAccount" // mapped to updateAccount
@@ -67,6 +68,7 @@ export type EvmClientInterface = Omit<
   ) => Promise<SendUserOperationReturnType>;
   signHash: (options: SignHashOptions) => Promise<SignatureResult>;
   signMessage: (options: SignMessageOptions) => Promise<SignatureResult>;
+  signTypedData: (options: SignTypedDataOptions) => Promise<SignatureResult>;
   signTransaction: (options: SignTransactionOptions) => Promise<SignatureResult>;
 };
 
@@ -257,6 +259,24 @@ export interface SignMessageOptions {
   address: Address;
   /** The message to sign. */
   message: string;
+  /** The idempotency key. */
+  idempotencyKey?: string;
+}
+
+/**
+ * Options for signing an EVM message.
+ */
+export interface SignTypedDataOptions {
+  /** The address of the account. */
+  address: Address;
+  /** The domain of the message. */
+  domain: EIP712Message["domain"];
+  /** The types of the message. */
+  types: EIP712Message["types"];
+  /** The primary type of the message. This is the name of the struct in the `types` object that is the root of the message. */
+  primaryType: EIP712Message["primaryType"];
+  /** The message to sign. The structure of this message must match the `primaryType` struct in the `types` object. */
+  message: EIP712Message["message"];
   /** The idempotency key. */
   idempotencyKey?: string;
 }
