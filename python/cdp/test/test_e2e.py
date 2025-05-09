@@ -13,6 +13,7 @@ from cdp import CdpClient
 from cdp.actions.evm.transfer.types import TransferOptions
 from cdp.evm_call_types import EncodedCall
 from cdp.evm_transaction_types import TransactionRequestEIP1559
+from cdp.openapi_client.models.eip712_domain import EIP712Domain
 
 load_dotenv()
 
@@ -406,6 +407,67 @@ async def test_solana_sign_fns(cdp_client):
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
+async def test_evm_sign_typed_data(cdp_client):
+    """Test signing typed data."""
+    account = await cdp_client.evm.get_or_create_account(name="E2EServerAccount")
+    assert account is not None
+
+    signature = await cdp_client.evm.sign_typed_data(
+        address=account.address,
+        domain=EIP712Domain(
+            name="EIP712Domain",
+            chain_id=1,
+            verifying_contract="0x0000000000000000000000000000000000000000",
+        ),
+        types={
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"},
+            ],
+        },
+        primary_type="EIP712Domain",
+        message={
+            "name": "EIP712Domain",
+            "chainId": 1,
+            "verifyingContract": "0x0000000000000000000000000000000000000000",
+        },
+    )
+    assert signature is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_evm_sign_typed_data_for_account(cdp_client):
+    """Test signing typed data for an account."""
+    account = await cdp_client.evm.get_or_create_account(name="E2EServerAccount")
+    assert account is not None
+
+    signature = await account.sign_typed_data(
+        domain=EIP712Domain(
+            name="EIP712Domain",
+            chain_id=1,
+            verifying_contract="0x0000000000000000000000000000000000000000",
+        ),
+        types={
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"},
+            ],
+        },
+        primary_type="EIP712Domain",
+        message={
+            "name": "EIP712Domain",
+            "chainId": 1,
+            "verifyingContract": "0x0000000000000000000000000000000000000000",
+        },
+    )
+    assert signature is not None
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
 async def test_transfer_eth(cdp_client):
     """Test transferring ETH."""
     account = await cdp_client.evm.create_account()
@@ -486,6 +548,38 @@ async def test_transfer_usdc_smart_account(cdp_client):
 
     assert transfer_result is not None
     assert transfer_result.status == "success"
+
+
+async def _ensure_sufficient_eth_balance(cdp_client, account):
+    """Ensure an account has sufficient ETH balance."""
+    min_required_balance = w3.to_wei(0.000001, "ether")
+
+    eth_balance = w3.eth.get_balance(account.address)
+
+    print(f"Current ETH balance: {w3.from_wei(eth_balance, 'ether')} ETH")
+
+    if eth_balance < min_required_balance:
+        print(
+            f"ETH balance below minimum required ({w3.from_wei(min_required_balance, 'ether')} ETH)"
+        )
+        faucet_hash = await cdp_client.evm.request_faucet(
+            address=account.address, network="base-sepolia", token="eth"
+        )
+
+        print(f"Faucet request submitted: {faucet_hash}")
+
+        w3.eth.wait_for_transaction_receipt(faucet_hash)
+
+        # Verify the balance is now sufficient
+        new_balance = w3.eth.get_balance(account.address)
+        assert (
+            new_balance >= min_required_balance
+        ), f"Balance still insufficient after faucet request: {w3.from_wei(new_balance, 'ether')} ETH"
+        return new_balance
+    else:
+        print(f"ETH balance is sufficient: {w3.from_wei(eth_balance, 'ether')} ETH")
+
+    return eth_balance
 
 
 @pytest.mark.e2e

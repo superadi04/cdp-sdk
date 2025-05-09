@@ -15,6 +15,8 @@ from cdp.evm_token_balances import (
     ListTokenBalancesResult,
 )
 from cdp.evm_transaction_types import TransactionRequestEIP1559
+from cdp.openapi_client.models.eip712_domain import EIP712Domain
+from cdp.openapi_client.models.eip712_message import EIP712Message
 from cdp.openapi_client.models.request_evm_faucet_request import RequestEvmFaucetRequest
 from cdp.openapi_client.models.send_evm_transaction200_response import SendEvmTransaction200Response
 from cdp.openapi_client.models.send_evm_transaction_request import SendEvmTransactionRequest
@@ -97,6 +99,62 @@ async def test_sign_message_with_bytes(mock_api, server_account_model_factory):
     assert result.v == mock_signature[64]
     assert result.signature == HexBytes(mock_signature)
     assert result.message_hash == _hash_eip191_message(signable_message)
+
+
+@pytest.mark.asyncio
+@patch("cdp.evm_server_account.EVMAccountsApi")
+async def test_sign_typed_data(mock_api, server_account_model_factory):
+    """Test sign_typed_data method."""
+    address = "0x1234567890123456789012345678901234567890"
+
+    server_account_model = server_account_model_factory(address)
+    server_account = EvmServerAccount(server_account_model, mock_api, mock_api)
+
+    domain = EIP712Domain(
+        name="EIP712Domain",
+        version="1",
+        chain_id=1,
+        verifying_contract="0x1234567890123456789012345678901234567890",
+    )
+    types = {
+        "EIP712Domain": [
+            {"name": "name", "type": "string"},
+            {"name": "chainId", "type": "uint256"},
+            {"name": "verifyingContract", "type": "address"},
+        ],
+    }
+    primary_type = "EIP712Domain"
+    message = {
+        "name": "EIP712Domain",
+        "chainId": 1,
+        "verifyingContract": "0x1234567890123456789012345678901234567890",
+    }
+    test_idempotency_key = "test-idempotency-key"
+
+    signature_response = AsyncMock()
+    signature_response.signature = "0xsignature"
+    mock_api.sign_evm_typed_data = AsyncMock(return_value=signature_response)
+
+    result = await server_account.sign_typed_data(
+        domain=domain,
+        types=types,
+        primary_type=primary_type,
+        message=message,
+        idempotency_key=test_idempotency_key,
+    )
+
+    assert result == signature_response.signature
+
+    mock_api.sign_evm_typed_data.assert_called_once_with(
+        address=address,
+        eip712_message=EIP712Message(
+            domain=domain,
+            types=types,
+            primary_type=primary_type,
+            message=message,
+        ),
+        x_idempotency_key=test_idempotency_key,
+    )
 
 
 @pytest.mark.asyncio
